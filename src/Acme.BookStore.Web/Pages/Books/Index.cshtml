@@ -1,0 +1,124 @@
+﻿@page
+@using Acme.BookStore.Books
+@using Acme.BookStore.Localization
+@using Acme.BookStore.Permissions
+@using Acme.BookStore.Web.Pages.Books
+@using DevExtreme.AspNet.Mvc
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.Extensions.Localization
+@model Acme.BookStore.Web.Pages.IndexModel
+@inject IStringLocalizer<BookStoreResource> L
+@inject IAuthorizationService AuthorizationService
+
+@(Html.DevExtreme().Form<BookSearchDto>()
+        .ID("searchForm")
+        .Items(items => {
+            items.AddGroup()
+                .ColCount(2)
+                .Caption("Inquiry data")
+                .Items(groupItems => {
+                    groupItems.AddSimpleFor(m=>m.BookType)
+                        .Label(l=>l.Text("Book Type"))
+                        .Editor(e => e
+                            .SelectBox()
+                            .DataSource(Html.GetEnumSelectList<BookType>().Select(i => new { Value = int.Parse(i.Value), Text = L[$"Enum:BookType.{i.Text}"].Value}))
+                            .ValueExpr("Value")
+                            .DisplayExpr("Text")
+                        );
+
+                    groupItems.AddSimpleFor(m=>m.AuthorId)
+                        .Label(l=>l.Text("Author"))
+                        .Editor(e => e
+                            .SelectBox()
+                            .DataSource(d => d.WebApi()
+                                .Controller("Book")
+                                .LoadAction("GetAuthorLookup"))
+                            .ValueExpr("Id")
+                            .DisplayExpr("Name")
+                        );
+                });
+            items.AddButton()
+                .ButtonOptions(b=> {
+                    b.Text("Search");
+                    b.OnClick("searchData");
+                });
+        })
+    )
+
+@(Html.DevExtreme().DataGrid<BookDto>()
+    .ID("grid")
+    .DataSource(d => d.Mvc()
+        .Controller("Book")
+        .LoadAction("GetDXList")
+        .LoadParams(new { bookSearchValues = new JS("getSearchData") })
+        .InsertAction("Create")
+        .UpdateAction("Update")
+        .DeleteAction("Delete")
+        .Key("Id")
+        //.OnBeforeSend("beforeSend")
+    )
+    .Paging(paging => paging.PageSize(10))
+    .Pager(pager => {
+        pager.Visible(true);
+        pager.DisplayMode(GridPagerDisplayMode.Full);
+        pager.ShowPageSizeSelector(true);
+        pager.AllowedPageSizes(new JS("[5, 10, 'all']"));
+        pager.ShowInfo(true);
+        pager.ShowNavigationButtons(true);
+    })
+    .RemoteOperations(true)
+    .ShowBorders(true)
+    .RepaintChangesOnly(true)
+    .Scrolling(s => s.Mode(GridScrollingMode.Virtual))
+    .Editing(e => e
+        .Mode(GridEditMode.Form)
+        .RefreshMode(GridEditRefreshMode.Reshape)
+        .AllowAdding(true)
+        .AllowDeleting(true)
+        .AllowUpdating(true)
+    )
+    .Columns(columns => {
+        columns.AddFor(m => m.Name);
+
+        columns.AddFor(m => m.AuthorId).Caption(L["Author"])
+            .Lookup(lookup => lookup
+                .DataSource(d => d.WebApi()
+                    .Controller("Book")
+                    .LoadAction("GetAuthorLookup")
+                    .LoadMode(DataSourceLoadMode.Raw)
+                )
+                .DataSourceOptions(o => o.Paginate(true))
+                .ValueExpr("Id")
+                .DisplayExpr("Name")
+            );
+
+        columns.AddFor(m => m.Type)
+            .Lookup(lookup => lookup
+                .DataSource(Html.GetEnumSelectList<BookType>().Select(i => new { Value = int.Parse(i.Value), Text = L[$"Enum:BookType.{i.Text}"].Value}))
+                .ValueExpr("Value")
+                .DisplayExpr("Text"));
+
+        columns.AddFor(m => m.PublishDate).Format("dd-MMM-yyyy");
+
+        columns.AddFor(m => m.Price);
+
+    })
+    .OnRowUpdating(@<text>
+        function (options) {
+        $.extend(options.newData, $.extend({}, options.oldData, options.newData));
+        }
+    </text>
+    )
+)
+
+<script>
+    function getSearchData() {
+        var searchForm = $("#searchForm").dxForm("instance");
+        if (searchForm != null)
+            return JSON.stringify(searchForm.option("formData"));
+        return null;
+    }
+    function searchData() {
+        $("#grid").dxDataGrid("instance").refresh();
+    }
+</script>
