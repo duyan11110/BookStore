@@ -188,7 +188,10 @@ namespace Acme.BookStore.Web
         {
             Configure<AbpAspNetCoreMvcOptions>(options =>
             {
-                options.ConventionalControllers.Create(typeof(BookStoreApplicationModule).Assembly);
+                options.ConventionalControllers.Create(typeof(BookStoreApplicationModule).Assembly, opts =>
+                {
+                    opts.RootPath = "book-store";
+                });
             });
         }
 
